@@ -1,0 +1,521 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Core Identity & Validation Primitives
+    // -------------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true;
+    }
+
+    function callerEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isAdmin() {
+      return isVerifiedEmail() && callerEmail() == 'akifmian340@gmail.com';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidEmailDocId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 128 && id.matches('^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Constant-path caller invite lookup (cached once per request by Firestore)
+    function hasActiveInvite() {
+      return isVerifiedEmail()
+        && exists(/databases/$(database)/documents/invites/$(callerEmail()))
+        && get(/databases/$(database)/documents/invites/$(callerEmail())).data.status == 'active';
+    }
+
+    function callerInviteRole() {
+      return get(/databases/$(database)/documents/invites/$(callerEmail())).data.role;
+    }
+
+    function isAuthorizedUser() {
+      return isAdmin() || hasActiveInvite();
+    }
+
+    function isActiveTeacher() {
+      return hasActiveInvite() && callerInviteRole() == 'teacher';
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation Blueprints (Anti-Update-Gap)
+    // -------------------------------------------------------------------------
+    function isValidInvite(data) {
+      return data.keys().hasAll(['email', 'role', 'displayName', 'linkedRecordId', 'status', 'addedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['email', 'role', 'displayName', 'linkedRecordId', 'status', 'addedBy', 'createdAt', 'updatedAt'])
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 128
+        && data.role in ['teacher', 'student', 'parent']
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && isValidId(data.linkedRecordId)
+        && data.status in ['active', 'suspended']
+        && data.addedBy is string && data.addedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCourse(data) {
+      return data.keys().hasAll(['id', 'code', 'title', 'description', 'durationMonths', 'feeMonthly', 'schedule', 'teacherId', 'teacherName', 'teacherEmail', 'modules', 'imageKey', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'code', 'title', 'description', 'durationMonths', 'feeMonthly', 'schedule', 'teacherId', 'teacherName', 'teacherEmail', 'modules', 'imageKey', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.code is string && data.code.size() >= 2 && data.code.size() <= 24
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 120
+        && data.description is string && data.description.size() <= 1000
+        && data.durationMonths is number && data.durationMonths >= 1 && data.durationMonths <= 60
+        && data.feeMonthly is number && data.feeMonthly >= 0 && data.feeMonthly <= 1000000
+        && data.schedule is string && data.schedule.size() <= 120
+        && data.teacherId is string && data.teacherId.size() <= 128
+        && data.teacherName is string && data.teacherName.size() <= 120
+        && data.teacherEmail is string && data.teacherEmail.size() <= 128
+        && data.modules is list && data.modules.size() <= 20
+        && (data.modules.size() == 0 || data.modules[0] is string)
+        && data.imageKey is string && data.imageKey.size() <= 64
+        && data.status in ['active', 'archived']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTeacher(data) {
+      return data.keys().hasAll(['id', 'fullName', 'email', 'phone', 'qualification', 'specialization', 'assignedCourseIds', 'status', 'joinedAt', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'fullName', 'email', 'phone', 'qualification', 'specialization', 'assignedCourseIds', 'status', 'joinedAt', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 128
+        && data.phone is string && data.phone.size() <= 32
+        && data.qualification is string && data.qualification.size() <= 160
+        && data.specialization is string && data.specialization.size() <= 160
+        && data.assignedCourseIds is list && data.assignedCourseIds.size() <= 15
+        && (data.assignedCourseIds.size() == 0 || data.assignedCourseIds[0] is string)
+        && data.status in ['active', 'inactive']
+        && data.joinedAt is string && data.joinedAt.size() <= 32
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudent(data) {
+      return data.keys().hasAll(['id', 'rollNumber', 'fullName', 'email', 'phone', 'courseIds', 'primaryCourseId', 'batch', 'parentEmail', 'parentName', 'feeStatus', 'monthlyFee', 'admissionDate', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'rollNumber', 'fullName', 'email', 'phone', 'courseIds', 'primaryCourseId', 'batch', 'parentEmail', 'parentName', 'feeStatus', 'monthlyFee', 'admissionDate', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.rollNumber is string && data.rollNumber.size() >= 2 && data.rollNumber.size() <= 32
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 128
+        && data.phone is string && data.phone.size() <= 32
+        && data.courseIds is list && data.courseIds.size() <= 10
+        && (data.courseIds.size() == 0 || data.courseIds[0] is string)
+        && data.primaryCourseId is string && data.primaryCourseId.size() <= 128
+        && data.batch is string && data.batch.size() <= 64
+        && data.parentEmail is string && data.parentEmail.size() <= 128
+        && data.parentName is string && data.parentName.size() <= 120
+        && data.feeStatus in ['paid', 'pending', 'partial']
+        && data.monthlyFee is number && data.monthlyFee >= 0 && data.monthlyFee <= 1000000
+        && data.admissionDate is string && data.admissionDate.size() <= 32
+        && data.status in ['active', 'graduated', 'suspended']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidParent(data) {
+      return data.keys().hasAll(['id', 'fullName', 'email', 'phone', 'relationship', 'linkedStudentIds', 'linkedStudentEmails', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'fullName', 'email', 'phone', 'relationship', 'linkedStudentIds', 'linkedStudentEmails', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 128
+        && data.phone is string && data.phone.size() <= 32
+        && data.relationship is string && data.relationship.size() <= 48
+        && data.linkedStudentIds is list && data.linkedStudentIds.size() <= 10
+        && (data.linkedStudentIds.size() == 0 || data.linkedStudentIds[0] is string)
+        && data.linkedStudentEmails is list && data.linkedStudentEmails.size() <= 10
+        && (data.linkedStudentEmails.size() == 0 || data.linkedStudentEmails[0] is string)
+        && data.status in ['active', 'inactive']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidEnrollment(data) {
+      return data.keys().hasAll(['id', 'studentId', 'studentName', 'studentRollNumber', 'studentEmail', 'courseId', 'courseTitle', 'teacherEmail', 'parentEmail', 'batch', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'studentId', 'studentName', 'studentRollNumber', 'studentEmail', 'courseId', 'courseTitle', 'teacherEmail', 'parentEmail', 'batch', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.studentId)
+        && data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 120
+        && data.studentRollNumber is string && data.studentRollNumber.size() <= 32
+        && data.studentEmail is string && data.studentEmail.size() <= 128
+        && isValidId(data.courseId)
+        && data.courseTitle is string && data.courseTitle.size() <= 120
+        && data.teacherEmail is string && data.teacherEmail.size() <= 128
+        && data.parentEmail is string && data.parentEmail.size() <= 128
+        && data.batch is string && data.batch.size() <= 64
+        && data.status in ['active', 'completed', 'dropped']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAttendance(data) {
+      return data.keys().hasAll(['id', 'date', 'courseId', 'courseTitle', 'studentId', 'studentName', 'studentRollNumber', 'studentEmail', 'parentEmail', 'teacherEmail', 'status', 'remarks', 'markedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'date', 'courseId', 'courseTitle', 'studentId', 'studentName', 'studentRollNumber', 'studentEmail', 'parentEmail', 'teacherEmail', 'status', 'remarks', 'markedBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.date is string && data.date.size() >= 8 && data.date.size() <= 16
+        && isValidId(data.courseId)
+        && data.courseTitle is string && data.courseTitle.size() <= 120
+        && isValidId(data.studentId)
+        && data.studentName is string && data.studentName.size() <= 120
+        && data.studentRollNumber is string && data.studentRollNumber.size() <= 32
+        && data.studentEmail is string && data.studentEmail.size() <= 128
+        && data.parentEmail is string && data.parentEmail.size() <= 128
+        && data.teacherEmail is string && data.teacherEmail.size() <= 128
+        && data.status in ['present', 'absent', 'late']
+        && data.remarks is string && data.remarks.size() <= 300
+        && data.markedBy is string && data.markedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidGrade(data) {
+      return data.keys().hasAll(['id', 'studentId', 'studentName', 'studentRollNumber', 'studentEmail', 'parentEmail', 'courseId', 'courseTitle', 'teacherEmail', 'assessmentTitle', 'score', 'maxScore', 'gradeLetter', 'remarks', 'gradedDate', 'gradedBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'studentId', 'studentName', 'studentRollNumber', 'studentEmail', 'parentEmail', 'courseId', 'courseTitle', 'teacherEmail', 'assessmentTitle', 'score', 'maxScore', 'gradeLetter', 'remarks', 'gradedDate', 'gradedBy', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.studentId)
+        && data.studentName is string && data.studentName.size() <= 120
+        && data.studentRollNumber is string && data.studentRollNumber.size() <= 32
+        && data.studentEmail is string && data.studentEmail.size() <= 128
+        && data.parentEmail is string && data.parentEmail.size() <= 128
+        && isValidId(data.courseId)
+        && data.courseTitle is string && data.courseTitle.size() <= 120
+        && data.teacherEmail is string && data.teacherEmail.size() <= 128
+        && data.assessmentTitle is string && data.assessmentTitle.size() >= 2 && data.assessmentTitle.size() <= 120
+        && data.score is number && data.score >= 0 && data.score <= 10000
+        && data.maxScore is number && data.maxScore >= 1 && data.maxScore <= 10000
+        && data.gradeLetter is string && data.gradeLetter.size() <= 8
+        && data.remarks is string && data.remarks.size() <= 400
+        && data.gradedDate is string && data.gradedDate.size() <= 16
+        && data.gradedBy is string && data.gradedBy.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFee(data) {
+      return data.keys().hasAll(['id', 'studentId', 'studentName', 'studentRollNumber', 'studentEmail', 'parentEmail', 'courseId', 'courseTitle', 'monthLabel', 'amount', 'paidAmount', 'status', 'dueDate', 'paidDate', 'receiptNo', 'notes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'studentId', 'studentName', 'studentRollNumber', 'studentEmail', 'parentEmail', 'courseId', 'courseTitle', 'monthLabel', 'amount', 'paidAmount', 'status', 'dueDate', 'paidDate', 'receiptNo', 'notes', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.studentId)
+        && data.studentName is string && data.studentName.size() <= 120
+        && data.studentRollNumber is string && data.studentRollNumber.size() <= 32
+        && data.studentEmail is string && data.studentEmail.size() <= 128
+        && data.parentEmail is string && data.parentEmail.size() <= 128
+        && isValidId(data.courseId)
+        && data.courseTitle is string && data.courseTitle.size() <= 120
+        && data.monthLabel is string && data.monthLabel.size() <= 48
+        && data.amount is number && data.amount >= 0 && data.amount <= 1000000
+        && data.paidAmount is number && data.paidAmount >= 0 && data.paidAmount <= 1000000
+        && data.status in ['paid', 'pending', 'partial']
+        && data.dueDate is string && data.dueDate.size() <= 16
+        && data.paidDate is string && data.paidDate.size() <= 16
+        && data.receiptNo is string && data.receiptNo.size() <= 48
+        && data.notes is string && data.notes.size() <= 300
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAnnouncement(data) {
+      return data.keys().hasAll(['id', 'title', 'body', 'targetRole', 'courseId', 'courseTitle', 'authorName', 'authorEmail', 'authorRole', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'title', 'body', 'targetRole', 'courseId', 'courseTitle', 'authorName', 'authorEmail', 'authorRole', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 140
+        && data.body is string && data.body.size() >= 2 && data.body.size() <= 2000
+        && data.targetRole in ['all', 'teacher', 'student', 'parent']
+        && data.courseId is string && data.courseId.size() <= 128
+        && data.courseTitle is string && data.courseTitle.size() <= 120
+        && data.authorName is string && data.authorName.size() <= 120
+        && data.authorEmail is string && data.authorEmail.size() <= 128
+        && data.authorRole in ['admin', 'teacher']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['id', 'category', 'action', 'details', 'actorName', 'actorEmail', 'actorRole', 'targetLabel', 'createdAt'])
+        && data.keys().hasOnly(['id', 'category', 'action', 'details', 'actorName', 'actorEmail', 'actorRole', 'targetLabel', 'createdAt'])
+        && isValidId(data.id)
+        && data.category in ['login', 'course', 'teacher', 'student', 'parent', 'attendance', 'grade', 'fee', 'announcement', 'access']
+        && data.action is string && data.action.size() >= 2 && data.action.size() <= 120
+        && data.details is string && data.details.size() <= 500
+        && data.actorName is string && data.actorName.size() <= 120
+        && data.actorEmail is string && data.actorEmail.size() >= 3 && data.actorEmail.size() <= 128
+        && data.actorRole in ['admin', 'teacher', 'student', 'parent']
+        && data.targetLabel is string && data.targetLabel.size() <= 120
+        && data.createdAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    match /test/connection {
+      allow get: if isSignedIn();
+    }
+
+    match /invites/{inviteEmail} {
+      allow get: if isValidEmailDocId(inviteEmail) && isVerifiedEmail() && (isAdmin() || callerEmail() == inviteEmail);
+      allow list: if isAdmin();
+      allow create: if isValidEmailDocId(inviteEmail)
+        && isAdmin()
+        && isValidInvite(incoming())
+        && incoming().email == inviteEmail
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidEmailDocId(inviteEmail)
+        && isAdmin()
+        && isValidInvite(incoming())
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'linkedRecordId', 'status', 'addedBy', 'updatedAt']);
+      allow delete: if isValidEmailDocId(inviteEmail) && isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow get: if isValidId(courseId) && isAuthorizedUser();
+      allow list: if isAuthorizedUser();
+      allow create: if isValidId(courseId)
+        && isAdmin()
+        && isValidCourse(incoming())
+        && incoming().id == courseId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(courseId)
+        && isAdmin()
+        && isValidCourse(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['code', 'title', 'description', 'durationMonths', 'feeMonthly', 'schedule', 'teacherId', 'teacherName', 'teacherEmail', 'modules', 'imageKey', 'status', 'updatedAt']);
+      allow delete: if isValidId(courseId) && isAdmin();
+    }
+
+    match /teachers/{teacherId} {
+      allow get: if isValidId(teacherId) && (isAdmin() || (hasActiveInvite() && existing().email == callerEmail()));
+      allow list: if isAdmin() || (hasActiveInvite() && resource.data.email == callerEmail());
+      allow create: if isValidId(teacherId)
+        && isAdmin()
+        && isValidTeacher(incoming())
+        && incoming().id == teacherId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(teacherId)
+        && isAdmin()
+        && isValidTeacher(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'email', 'phone', 'qualification', 'specialization', 'assignedCourseIds', 'status', 'joinedAt', 'updatedAt']);
+      allow delete: if isValidId(teacherId) && isAdmin();
+    }
+
+    match /students/{studentId} {
+      allow get: if isValidId(studentId) && (isAdmin() || (hasActiveInvite() && (existing().email == callerEmail() || existing().parentEmail == callerEmail())));
+      allow list: if isAdmin() || (hasActiveInvite() && (resource.data.email == callerEmail() || resource.data.parentEmail == callerEmail()));
+      allow create: if isValidId(studentId)
+        && isAdmin()
+        && isValidStudent(incoming())
+        && incoming().id == studentId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(studentId)
+        && isAdmin()
+        && isValidStudent(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['rollNumber', 'fullName', 'email', 'phone', 'courseIds', 'primaryCourseId', 'batch', 'parentEmail', 'parentName', 'feeStatus', 'monthlyFee', 'admissionDate', 'status', 'updatedAt']);
+      allow delete: if isValidId(studentId) && isAdmin();
+    }
+
+    match /parents/{parentId} {
+      allow get: if isValidId(parentId) && (isAdmin() || (hasActiveInvite() && existing().email == callerEmail()));
+      allow list: if isAdmin() || (hasActiveInvite() && resource.data.email == callerEmail());
+      allow create: if isValidId(parentId)
+        && isAdmin()
+        && isValidParent(incoming())
+        && incoming().id == parentId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(parentId)
+        && isAdmin()
+        && isValidParent(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'email', 'phone', 'relationship', 'linkedStudentIds', 'linkedStudentEmails', 'status', 'updatedAt']);
+      allow delete: if isValidId(parentId) && isAdmin();
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow get: if isValidId(enrollmentId) && (isAdmin() || (hasActiveInvite() && (existing().studentEmail == callerEmail() || existing().parentEmail == callerEmail() || existing().teacherEmail == callerEmail())));
+      allow list: if isAdmin() || (hasActiveInvite() && (resource.data.studentEmail == callerEmail() || resource.data.parentEmail == callerEmail() || resource.data.teacherEmail == callerEmail()));
+      allow create: if isValidId(enrollmentId)
+        && isAdmin()
+        && isValidEnrollment(incoming())
+        && incoming().id == enrollmentId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(enrollmentId)
+        && isAdmin()
+        && isValidEnrollment(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['studentName', 'studentRollNumber', 'studentEmail', 'courseId', 'courseTitle', 'teacherEmail', 'parentEmail', 'batch', 'status', 'updatedAt']);
+      allow delete: if isValidId(enrollmentId) && isAdmin();
+    }
+
+    match /attendance/{recordId} {
+      allow get: if isValidId(recordId) && (isAdmin() || (hasActiveInvite() && (existing().studentEmail == callerEmail() || existing().parentEmail == callerEmail() || existing().teacherEmail == callerEmail())));
+      allow list: if isAdmin() || (hasActiveInvite() && (resource.data.studentEmail == callerEmail() || resource.data.parentEmail == callerEmail() || resource.data.teacherEmail == callerEmail()));
+      allow create: if isValidId(recordId)
+        && isValidAttendance(incoming())
+        && incoming().id == recordId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isAdmin() || (isActiveTeacher() && incoming().teacherEmail == callerEmail() && incoming().markedBy == callerEmail()));
+      allow update: if isValidId(recordId)
+        && isValidAttendance(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            isActiveTeacher()
+            && existing().teacherEmail == callerEmail()
+            && incoming().teacherEmail == existing().teacherEmail
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'remarks', 'markedBy', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(recordId) && isAdmin();
+    }
+
+    match /grades/{gradeId} {
+      allow get: if isValidId(gradeId) && (isAdmin() || (hasActiveInvite() && (existing().studentEmail == callerEmail() || existing().parentEmail == callerEmail() || existing().teacherEmail == callerEmail())));
+      allow list: if isAdmin() || (hasActiveInvite() && (resource.data.studentEmail == callerEmail() || resource.data.parentEmail == callerEmail() || resource.data.teacherEmail == callerEmail()));
+      allow create: if isValidId(gradeId)
+        && isValidGrade(incoming())
+        && incoming().id == gradeId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isAdmin() || (isActiveTeacher() && incoming().teacherEmail == callerEmail() && incoming().gradedBy == callerEmail()));
+      allow update: if isValidId(gradeId)
+        && isValidGrade(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            isActiveTeacher()
+            && existing().teacherEmail == callerEmail()
+            && incoming().teacherEmail == existing().teacherEmail
+            && incoming().diff(existing()).affectedKeys().hasOnly(['assessmentTitle', 'score', 'maxScore', 'gradeLetter', 'remarks', 'gradedDate', 'gradedBy', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(gradeId) && isAdmin();
+    }
+
+    match /fees/{feeId} {
+      allow get: if isValidId(feeId) && (isAdmin() || (hasActiveInvite() && (existing().studentEmail == callerEmail() || existing().parentEmail == callerEmail())));
+      allow list: if isAdmin() || (hasActiveInvite() && (resource.data.studentEmail == callerEmail() || resource.data.parentEmail == callerEmail()));
+      allow create: if isValidId(feeId)
+        && isAdmin()
+        && isValidFee(incoming())
+        && incoming().id == feeId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(feeId)
+        && isAdmin()
+        && isValidFee(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['monthLabel', 'amount', 'paidAmount', 'status', 'dueDate', 'paidDate', 'receiptNo', 'notes', 'parentEmail', 'studentEmail', 'updatedAt']);
+      allow delete: if isValidId(feeId) && isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow get: if isValidId(announcementId) && (
+        isAdmin()
+        || (hasActiveInvite() && (existing().targetRole == 'all' || existing().targetRole == callerInviteRole() || existing().authorEmail == callerEmail()))
+      );
+      allow list: if isAdmin() || (
+        hasActiveInvite() && (resource.data.targetRole == 'all' || resource.data.targetRole == callerInviteRole() || resource.data.authorEmail == callerEmail())
+      );
+      allow create: if isValidId(announcementId)
+        && isValidAnnouncement(incoming())
+        && incoming().id == announcementId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isAdmin() || (isActiveTeacher() && incoming().authorEmail == callerEmail() && incoming().authorRole == 'teacher'));
+      allow update: if isValidId(announcementId)
+        && isValidAnnouncement(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            isActiveTeacher()
+            && existing().authorEmail == callerEmail()
+            && incoming().authorEmail == existing().authorEmail
+            && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'body', 'targetRole', 'courseId', 'courseTitle', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(announcementId) && (isAdmin() || (isActiveTeacher() && existing().authorEmail == callerEmail()));
+    }
+
+    match /activity_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(logId)
+        && isValidActivityLog(incoming())
+        && incoming().id == logId
+        && incoming().createdAt == request.time
+        && incoming().actorEmail == callerEmail()
+        && (
+          (isAdmin() && incoming().actorRole == 'admin')
+          || (
+            hasActiveInvite()
+            && incoming().actorRole == callerInviteRole()
+            && (
+              incoming().category == 'login'
+              || (isActiveTeacher() && incoming().category in ['attendance', 'grade', 'announcement'])
+            )
+          )
+        );
+      allow update: if false;
+      allow delete: if isValidId(logId) && isAdmin();
+    }
+  }
+}

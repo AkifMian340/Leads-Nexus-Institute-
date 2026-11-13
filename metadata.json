@@ -1,0 +1,10 @@
+{
+  "name": "Leads Nexus Institute",
+  "description": "Computer diploma institute management portal for Leads Nexus Institute covering Office Management, Graphic Designing, Digital Marketing, Web Development, and AI Tutor with role-based access for Admin, Teachers, Students, and Parents.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

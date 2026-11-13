@@ -1,0 +1,734 @@
+{
+  "entities": {
+    "Invite": {
+      "title": "Authorized User Invite",
+      "description": "Admin-managed allowlist entry authorizing a Google email to log into a specific Leads Nexus Institute portal.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 128,
+          "description": "Lowercase Google account email address authorized by Admin."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["teacher", "student", "parent"],
+          "description": "Assigned portal role for this user."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Full display name of the invited user."
+        },
+        "linkedRecordId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Document ID in teachers, students, or parents collection."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended"],
+          "description": "Whether login access is currently active or suspended."
+        },
+        "addedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Admin email who created this authorization."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "role", "displayName", "linkedRecordId", "status", "addedBy", "createdAt", "updatedAt"]
+    },
+    "Course": {
+      "title": "Diploma Course",
+      "description": "Computer diploma course track at Leads Nexus Institute.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "durationMonths": {
+          "type": "number"
+        },
+        "feeMonthly": {
+          "type": "number"
+        },
+        "schedule": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "teacherId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "teacherName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "teacherEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "modules": {
+          "type": "array"
+        },
+        "imageKey": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "archived"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "code", "title", "description", "durationMonths", "feeMonthly", "schedule", "teacherId", "teacherName", "teacherEmail", "modules", "imageKey", "status", "createdAt", "updatedAt"]
+    },
+    "Teacher": {
+      "title": "Institute Teacher",
+      "description": "Faculty member profile managed by Admin.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 128
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "qualification": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "specialization": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "assignedCourseIds": {
+          "type": "array"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive"]
+        },
+        "joinedAt": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "fullName", "email", "phone", "qualification", "specialization", "assignedCourseIds", "status", "joinedAt", "createdAt", "updatedAt"]
+    },
+    "Student": {
+      "title": "Diploma Student",
+      "description": "Student enrolled in computer diploma courses at Leads Nexus Institute.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "rollNumber": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 32
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 128
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "courseIds": {
+          "type": "array"
+        },
+        "primaryCourseId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "batch": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "parentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "parentName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "feeStatus": {
+          "type": "string",
+          "enum": ["paid", "pending", "partial"]
+        },
+        "monthlyFee": {
+          "type": "number"
+        },
+        "admissionDate": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "graduated", "suspended"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "rollNumber", "fullName", "email", "phone", "courseIds", "primaryCourseId", "batch", "parentEmail", "parentName", "feeStatus", "monthlyFee", "admissionDate", "status", "createdAt", "updatedAt"]
+    },
+    "Parent": {
+      "title": "Parent / Guardian",
+      "description": "Parent or guardian linked to one or more diploma students.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 128
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "relationship": {
+          "type": "string",
+          "maxLength": 48
+        },
+        "linkedStudentIds": {
+          "type": "array"
+        },
+        "linkedStudentEmails": {
+          "type": "array"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "fullName", "email", "phone", "relationship", "linkedStudentIds", "linkedStudentEmails", "status", "createdAt", "updatedAt"]
+    },
+    "Enrollment": {
+      "title": "Course Enrollment",
+      "description": "Relational link between student, course, teacher, and parent for scoped portal queries.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "studentRollNumber": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "studentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "courseId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "courseTitle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "teacherEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "parentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "batch": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "completed", "dropped"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "studentId", "studentName", "studentRollNumber", "studentEmail", "courseId", "courseTitle", "teacherEmail", "parentEmail", "batch", "status", "createdAt", "updatedAt"]
+    },
+    "AttendanceRecord": {
+      "title": "Attendance Record",
+      "description": "Daily class attendance entry for a student in a course.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "courseId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "courseTitle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "studentId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "studentRollNumber": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "studentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "parentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "teacherEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": ["present", "absent", "late"]
+        },
+        "remarks": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "markedBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "date", "courseId", "courseTitle", "studentId", "studentName", "studentRollNumber", "studentEmail", "parentEmail", "teacherEmail", "status", "remarks", "markedBy", "createdAt", "updatedAt"]
+    },
+    "GradeRecord": {
+      "title": "Assessment Grade",
+      "description": "Exam, assignment, or practical evaluation score for a student.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "studentRollNumber": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "studentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "parentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "courseId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "courseTitle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "teacherEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "assessmentTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "score": {
+          "type": "number"
+        },
+        "maxScore": {
+          "type": "number"
+        },
+        "gradeLetter": {
+          "type": "string",
+          "maxLength": 8
+        },
+        "remarks": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "gradedDate": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "gradedBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "studentId", "studentName", "studentRollNumber", "studentEmail", "parentEmail", "courseId", "courseTitle", "teacherEmail", "assessmentTitle", "score", "maxScore", "gradeLetter", "remarks", "gradedDate", "gradedBy", "createdAt", "updatedAt"]
+    },
+    "FeeRecord": {
+      "title": "Tuition Fee Voucher",
+      "description": "Monthly or diploma tuition fee ledger record.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "studentRollNumber": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "studentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "parentEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "courseId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "courseTitle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "monthLabel": {
+          "type": "string",
+          "maxLength": 48
+        },
+        "amount": {
+          "type": "number"
+        },
+        "paidAmount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["paid", "pending", "partial"]
+        },
+        "dueDate": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "paidDate": {
+          "type": "string",
+          "maxLength": 16
+        },
+        "receiptNo": {
+          "type": "string",
+          "maxLength": 48
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "studentId", "studentName", "studentRollNumber", "studentEmail", "parentEmail", "courseId", "courseTitle", "monthLabel", "amount", "paidAmount", "status", "dueDate", "paidDate", "receiptNo", "notes", "createdAt", "updatedAt"]
+    },
+    "Announcement": {
+      "title": "Institute Announcement",
+      "description": "Notice board announcement posted by Admin or Teachers.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 140
+        },
+        "body": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2000
+        },
+        "targetRole": {
+          "type": "string",
+          "enum": ["all", "teacher", "student", "parent"]
+        },
+        "courseId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "courseTitle": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "authorName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "authorEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "authorRole": {
+          "type": "string",
+          "enum": ["admin", "teacher"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "title", "body", "targetRole", "courseId", "courseTitle", "authorName", "authorEmail", "authorRole", "createdAt", "updatedAt"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log Entry",
+      "description": "Audit log of portal logins and administrative or staff actions.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["login", "course", "teacher", "student", "parent", "attendance", "grade", "fee", "announcement", "access"]
+        },
+        "action": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "actorName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "actorEmail": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "actorRole": {
+          "type": "string",
+          "enum": ["admin", "teacher", "student", "parent"]
+        },
+        "targetLabel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "category", "action", "details", "actorName", "actorEmail", "actorRole", "targetLabel", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/invites/{inviteEmail}": {
+      "schema": { "$ref": "#/entities/Invite" },
+      "description": "Pre-authorized Google email allowlist managed exclusively by Admin."
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "The 5 computer diploma courses and any admin-managed tracks."
+    },
+    "/teachers/{teacherId}": {
+      "schema": { "$ref": "#/entities/Teacher" },
+      "description": "Teacher profiles and course assignments."
+    },
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Student records, roll numbers, and parent/course links."
+    },
+    "/parents/{parentId}": {
+      "schema": { "$ref": "#/entities/Parent" },
+      "description": "Parent and guardian records linked to students."
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": { "$ref": "#/entities/Enrollment" },
+      "description": "Course enrollment links for role-scoped portal views."
+    },
+    "/attendance/{recordId}": {
+      "schema": { "$ref": "#/entities/AttendanceRecord" },
+      "description": "Daily attendance records marked by Admin or assigned Teachers."
+    },
+    "/grades/{gradeId}": {
+      "schema": { "$ref": "#/entities/GradeRecord" },
+      "description": "Assessment scores and remarks."
+    },
+    "/fees/{feeId}": {
+      "schema": { "$ref": "#/entities/FeeRecord" },
+      "description": "Tuition fee records managed by Admin."
+    },
+    "/announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "Institute and course announcements."
+    },
+    "/activity_logs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Immutable audit log of logins and staff actions visible to Admin."
+    }
+  }
+}
